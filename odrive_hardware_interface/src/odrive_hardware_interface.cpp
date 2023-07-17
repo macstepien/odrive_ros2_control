@@ -30,7 +30,7 @@ CallbackReturn ODriveHardwareInterface::on_init(const hardware_interface::Hardwa
 
   hw_positions_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   hw_velocities_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
-  hw_efforts_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+  hw_efforts_.resize(info_.joints.size(), 0.0);
   hw_commands_positions_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   hw_commands_velocities_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   hw_commands_efforts_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
@@ -272,22 +272,9 @@ return_type ODriveHardwareInterface::perform_command_mode_switch(
 
 return_type ODriveHardwareInterface::read(const rclcpp::Time &, const rclcpp::Duration &)
 {
-  for (size_t i = 0; i < info_.sensors.size(); i++) {
-    float vbus_voltage;
-
-    CHECK_RW(odrive->read(serial_numbers_[0][i], VBUS_VOLTAGE, vbus_voltage));
-    hw_vbus_voltages_[i] = vbus_voltage;
-  }
 
   for (size_t i = 0; i < info_.joints.size(); i++) {
-    float Iq_measured, vel_estimate, pos_estimate, fet_temperature, motor_temperature;
-    int32_t axis_error, motor_error, encoder_error, controller_error;
-
-    CHECK_RW(odrive->read(
-      serial_numbers_[1][i], AXIS__MOTOR__CURRENT_CONTROL__IQ_MEASURED + per_axis_offset * axes_[i],
-      Iq_measured));
-    hw_efforts_[i] = Iq_measured * torque_constants_[i];
-
+    float vel_estimate, pos_estimate;
     CHECK_RW(odrive->read(
       serial_numbers_[1][i], AXIS__ENCODER__VEL_ESTIMATE + per_axis_offset * axes_[i],
       vel_estimate));
@@ -297,33 +284,6 @@ return_type ODriveHardwareInterface::read(const rclcpp::Time &, const rclcpp::Du
       serial_numbers_[1][i], AXIS__ENCODER__POS_ESTIMATE + per_axis_offset * axes_[i],
       pos_estimate));
     hw_positions_[i] = pos_estimate * 2 * M_PI;
-
-    CHECK_RW(
-      odrive->read(serial_numbers_[1][i], AXIS__ERROR + per_axis_offset * axes_[i], axis_error));
-    hw_axis_errors_[i] = axis_error;
-
-    CHECK_RW(odrive->read(
-      serial_numbers_[1][i], AXIS__MOTOR__ERROR + per_axis_offset * axes_[i], motor_error));
-    hw_motor_errors_[i] = motor_error;
-
-    CHECK_RW(odrive->read(
-      serial_numbers_[1][i], AXIS__ENCODER__ERROR + per_axis_offset * axes_[i], encoder_error));
-    hw_encoder_errors_[i] = encoder_error;
-
-    CHECK_RW(odrive->read(
-      serial_numbers_[1][i], AXIS__CONTROLLER__ERROR + per_axis_offset * axes_[i],
-      controller_error));
-    hw_controller_errors_[i] = controller_error;
-
-    CHECK_RW(odrive->read(
-      serial_numbers_[1][i], AXIS__FET_THERMISTOR__TEMPERATURE + per_axis_offset * axes_[i],
-      fet_temperature));
-    hw_fet_temperatures_[i] = fet_temperature;
-
-    CHECK_RW(odrive->read(
-      serial_numbers_[1][i], AXIS__MOTOR_THERMISTOR__TEMPERATURE + per_axis_offset * axes_[i],
-      motor_temperature));
-    hw_motor_temperatures_[i] = motor_temperature;
   }
 
   return return_type::OK;
